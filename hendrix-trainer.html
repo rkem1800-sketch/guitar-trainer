@@ -229,6 +229,7 @@ select.nv{font-size:17px;font-weight:400;width:62px}
 [hidden]{display:none!important}
 .hx-songs{display:grid;gap:8px}.hx-song{border:1px solid rgba(128,128,128,.35);border-radius:10px;padding:8px}.hx-song .pill{margin-top:6px}
 .hxswitch{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px;margin:8px 0}.hxswitch button{min-height:52px;border-radius:12px;border:2px solid var(--btnBorder);background:var(--btn);font-size:15px;font-weight:800;letter-spacing:.02em;line-height:1.1}.hxswitch button.on{background:var(--blue);border-color:var(--blue);color:#fff}.seg.big button{padding:10px 12px;font-size:13px}.rh-play{height:52px;font-size:17px;margin-top:6px}
+.sololv{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}.sololv button{min-height:48px;border-radius:12px;border:2px solid var(--btnBorder);background:var(--btn);color:var(--ink);font-size:13px;font-weight:800;letter-spacing:.03em;cursor:pointer}.sololv button.on{background:var(--blue);border-color:var(--blue);color:#fff}
 </style>
 </head>
 <body>
@@ -1138,6 +1139,7 @@ var Hendrix = (function () {
     if (L.scale === 'majpent') set = set.concat(pent(ch.rootPc, false));
     else if (L.scale === 'mixed') set = set.concat(pent(key, false), pent(key, true));
     else if (L.scale === '7#9') set = set.concat(pent(key, true));
+    else if (L.scale === 'song') set = set.concat(soloScalePcs(L.si));
     else set = set.concat(pent(ch.rootPc, ch.q === 'min'));
     return set.filter(function (x, i) { return set.indexOf(x) === i; });
   }
@@ -1194,7 +1196,7 @@ var Hendrix = (function () {
     });
     var fr = []; steps.forEach(function (st) { st.notes.forEach(function (n) { fr.push(n.f); }); });
     var lo = Math.max(0, Math.min.apply(null, fr) - 1), hi = Math.min(16, Math.max.apply(null, fr) + 1);
-    var gp = L.scale === '7#9' || L.scale === 'mixed' ? pent(key, true) : pent(key, false);
+    var gp = L.scale === 'song' ? soloScalePcs(L.si) : L.scale === '7#9' || L.scale === 'mixed' ? pent(key, true) : pent(key, false);
     for (var s = 0; s < 6; s++) for (var f = lo; f <= hi; f++) if (gp.indexOf(mod(T.OPEN[s] + f, 12)) >= 0) ghost[s + ':' + f] = { s: s, f: f };
     return { steps: steps, says: says, total: chords.length * 4, bars: chords.length, offset: off, lesson: L, showChords: true, chords: chords, feel: L.feel,
       ghost: Object.keys(ghost).map(function (k) { return ghost[k]; }), hx: true };
@@ -1294,7 +1296,53 @@ var Hendrix = (function () {
     { title: 'Voodoo Child (Slight Return)', key: 4, keyName: 'E', scale: 'blues', scaleName: 'E blues / E minor pentatonic', tuning: 'E flat (half step down), as on most Hendrix recordings',
       note: 'Wah-wah blues-rock over an E root; uses the 7#9 sound', src: WP + ': Voodoo Child (Slight Return); Experience Hendrix notes' }
   ];
-  return { SONGS: SONGS, LESSONS: LESSONS, LEVELS: LEVELS, lessonIn: lessonIn, neckPath: neckPath, triadsOn: triadsOn, sevenSharpNine: sevenSharpNine, thumbShape: thumbShape,
+  // ---- SONG SOLOS: original example solos, written in A and moved to each song's key. Generic progressions, not the recordings.
+  QUAL['7'] = { ivs: [0, 4, 7, 10], sfx: '7', word: 'dominant 7' };
+  var SOLO_LV = ['beginner', 'intermediate', 'advanced'];
+  var SOLO_EXPLAIN = {
+    beginner: 'Few notes, simple rhythm: mostly the root of each chord plus its 3rd, 5th or flat 7. Land on the root when the chord changes.',
+    intermediate: 'Pentatonic phrases with bends (the 4th up to the 5th, the flat 7 up to the root), slides, and hammer-ons around the chord (triad embellishment).',
+    advanced: 'Double stops (3rd + flat 7, or the 3rd and sharp 9 of the 7#9 sound where it fits), faster triplet runs, and the major 3rd borrowed from the major pentatonic over the minor-pentatonic box.' };
+  var SOLOS = {
+    'Purple Haze': { feel: 'rock', bpm: 108, prog: 'I (7#9) \u2013 I (7#9) \u2013 IV7 \u2013 I (7#9)', chords: [[0, '7#9'], [0, '7#9'], [5, '7'], [0, '7#9']], lv: {
+      beginner: ['4-7@h 2-8@h', '2-5@q 2-8@q 4-7@h', '5-5@h 4-7@h', '4-7@w'],
+      intermediate: ['1-8@e 1-5@e 2-8b10@q 2-5@e 3-7@e 4-7@q', '3-5@e 3-h7@e 3-5@e 4-7@e 5-/7@q 5-5@q', '3-7b9@q 2-7@q 3-5@q 4-7@q', '3-8@e 3-7@e 3-5@q 4-7~@h'],
+      advanced: ['3-6+2-8@e 3-5+2-8@e 3-6+2-8@q 1-5@e 1-8@e 2-5@e 2-8@e', '3-6+2-8@e 3-6+2-8@e 4-7@e 4-5@e 5-7@e 5-6@e 5-5@q', '2-7+1-5@q 3-5+2-7@q 1-8@e 1-5@e 2-8@e 2-5@e', '1-8@t 1-5@t 2-8@t 2-5@t 3-7@t 3-5@t 4-7@h'] } },
+    'Little Wing': { feel: 'ballad', bpm: 70, prog: 'i \u2013 flat III \u2013 iv \u2013 i', chords: [[0, 'min'], [3, 'maj'], [5, 'min'], [0, 'min']], lv: {
+      beginner: ['4-7@h 3-5@h', '3-5@h 2-5@h', '3-7@h 1-5@h', '4-7@w'],
+      intermediate: ['3-5+2-5+1-5@q 2-5@e 2-h8@e 2-p5@e 3-5@e 3-h7@e 3-p5@e', '3-5+2-5+1-8@q 1-8@e 1-p5@e 2-5@e 2-h8@e 3-7b9@q', '3-7+2-6+1-5@q 1-5@e 2-6@e 3-7@e 4-7@e 2-8@q', '3-5+2-5+1-5@h 2-5@e 3-7@e 4-7@q'],
+      advanced: ['3-5+2-5@e 3-7+2-8@e 3-5+2-5@e 3-7+2-8@e 1-5@t 1-8@t 1-5@t 2-8@t 2-5@t 3-7@t', '2-8+1-8@q 2-5+1-5@q 1-8b10@q 1-8@e 2-8@e', '2-6+1-5@e 2-6+1-5@e 3-7@e 3-5@e 4-7@e 4-5@e 5-7@e 5-5@e', '5-7@e 4-5@e 4-7@e 3-5@e 3-7b9~@h'] } },
+    'Red House': { feel: 'blues', bpm: 66, prog: '12-bar slow blues: I7 \u00d74, IV7 \u00d72, I7 \u00d72, V7, IV7, I7, V7', chords: [0, 0, 0, 0, 5, 5, 0, 0, 7, 5, 0, 7].map(function (d) { return [d, '7']; }), lv: {
+      beginner: ['4-7@h 2-8@h', '2-5@h 4-7@h', '4-7@q 2-5@q 2-8@h', '4-7@w', '5-5@h 4-7@h', '3-5@h 5-5@h', '4-7@h 2-5@h', '4-7@w', '5-7@h 2-5@h', '5-5@w', '4-7@w', '5-7@h 3-7@h'],
+      intermediate: ['1-8@e 1-5@e 2-8b10@q 2-8@e 2-5@e 4-7@q', '3-7b9@q 3-5@e 4-7@e 4-5@h', '2-5@e 2-8@e 1-5@q 1-8b10~@h', '2-8@e 2-5@e 3-7@e 3-6@e 4-7@h', '2-7@q 3-5@q 3-7@q 4-7@q', '3-7b9@h 3-5@e 4-7@e 5-5@q', '5-/7@q 4-5@q 4-7@h', '1-5~@w', '2-5@q 3-7@q 4-6@q 5-7@q', '2-7@q 3-5@q 5-5@h', '4-7@e 3-5@e 3-6@q 2-5@h', '5-7@q 5-6@q 5-5@q 5-7@q'],
+      advanced: ['3-6+2-8@e 3-6+2-8@e 3-5+2-8@e 3-6+2-8@e 1-8@t 1-5@t 2-8@t 2-5@t 3-7@t 3-5@t', '2-8b10@q 1-5@e 1-8@e 1-5@e 2-8@e 2-5@q', '4-5+3-6@q 4-5+3-6@e 4-7+3-7@e 2-5+1-5@h', '3-8@e 3-7@e 3-5@e 4-7@e 4-5@e 5-7@e 5-6@e 5-5@e', '2-7+1-5@q 2-7+1-5@e 3-5@e 3-7b9@h', '3-5+2-7@e 3-7@e 4-7@e 4-5@e 5-7@q 5-5@q',
+        '1-8@t 1-5@t 2-8@t 2-5@t 3-7@t 3-5@t 3-6@q 4-7@q', '4-7+3-6@q 2-5+1-5@q 2-8b10~@h', '4-6+3-7@q 2-5+1-7@q 3-7@e 3-4@e 5-7@q', '2-7+1-5@q 3-5+2-7@q 5-5@h', '2-8@e 2-5@e 3-7@e 3-5@e 4-7@h', '5-7@e 5-6@e 5-5@e 6-8@e 6-7@q 5-7@q'] } },
+    'Foxy Lady': { feel: 'rock', bpm: 96, prog: 'i \u2013 flat VII \u2013 iv \u2013 i', chords: [[0, 'min'], [10, 'maj'], [5, 'min'], [0, 'min']], lv: {
+      beginner: ['4-7@h 3-5@h', '4-5@h 3-7@h', '3-7@h 1-5@h', '4-7@w'],
+      intermediate: ['2-8@q 2-8b10@q 2-5@e 1-5@e 1-8@q', '3-7b9@q 3-7@e 4-5@e 3-4@q 4-5@q', '2-6@q 1-5@q 3-5@e 3-h7@e 3-7@q', '1-5@e 2-8@e 2-5@e 3-7@e 4-7~@h'],
+      advanced: ['6-5@e 6-8@e 5-5@e 5-7@e 4-5@e 4-7@e 3-5+2-5@q', '3-7+2-8@q 3-4+2-8@q 4-5@t 3-4@t 3-7@t 2-8@q', '2-6+1-5@e 2-6+1-5@e 3-7+2-6@q 1-8@t 1-5@t 2-6@t 3-7@q', '3-5+2-5@q 3-7b9@q 1-5~@h'] } },
+    'All Along the Watchtower': { feel: 'rock', bpm: 112, prog: 'i \u2013 iv \u2013 v \u2013 i', chords: [[0, 'min'], [5, 'min'], [7, 'min'], [0, 'min']], lv: {
+      beginner: ['1-5@h 2-5@h', '3-7@h 2-6@h', '5-7@h 2-8@h', '4-7@w'],
+      intermediate: ['2-5@e 2-8@e 1-5@q 1-8b10@q 1-5@q', '3-7@e 3-5@e 4-7@q 3-/7@q 2-6@q', '2-8@q 2-5@e 3-7@e 3-4@q 2-5@q', '4-5@e 4-h7@e 4-7@q 3-5@q 4-7@q'],
+      advanced: ['2-5+1-5@e 2-8+1-8@e 2-5+1-5@q 1-8@t 1-5@t 2-8@t 2-5@q', '3-7+2-6@q 2-6+1-5@q 3-5@t 3-7@t 4-7@t 4-5@q', '3-4+2-5@q 3-4+2-8@e 3-7+2-8@e 5-7@e 5-5@e 6-7@q', '4-7@e 3-5@e 3-7b9@q 2-5+1-5@h'] } },
+    'Voodoo Child (Slight Return)': { feel: 'rock', bpm: 88, prog: 'I (7#9) \u2013 I (7#9) \u2013 IV7 \u2013 V7', chords: [[0, '7#9'], [0, '7#9'], [5, '7'], [7, '7']], lv: {
+      beginner: ['4-7@q 4-7@q 2-8@h', '2-5@h 4-7@h', '3-5@h 5-5@h', '5-7@h 3-7@h'],
+      intermediate: ['4-5@e 4-7@e 3-5@e 3-7@e 3-8@e 3-7@e 3-5@q', '2-8b10~@h 2-5@e 3-7@e 4-7@q', '2-7@q 3-7b9@q 3-5@e 4-7@e 5-5@q', '4-6@q 5-/7@q 3-7@e 3-4@e 2-5@q'],
+      advanced: ['3-6+2-8@e 3-5+2-8@e 3-6+2-8@q 3-8@t 3-7@t 3-5@t 4-7@q', '1-8b10@q 1-5@e 2-8@e 2-5+1-5@h', '2-7+1-5@e 3-5+2-7@e 2-7+1-5@q 1-8@t 1-5@t 2-7@t 3-5@q', '4-6+3-7@q 3-4+2-5@q 5-7@e 5-6@e 5-5@e 5-7@e'] } }
+  };
+  var SCALE_IVS = { minorPent: [0, 3, 5, 7, 10], blues: [0, 3, 5, 6, 7, 10] };
+  function soloScalePcs(si) { var sg = SONGS[si]; return SCALE_IVS[sg.scale].map(function (x) { return mod(sg.key + x, 12); }); }
+  var soloCache = {};
+  function songSolo(si, level) {
+    var id = si + ':' + level; if (soloCache[id]) return soloCache[id];
+    var sg = SONGS[si], S = SOLOS[sg.title], toks = S.lv[level];
+    var L = { id: 'solo-' + si + '-' + level, level: level, song: sg.title, name: sg.title + ' \u2013 ' + level.charAt(0).toUpperCase() + level.slice(1) + ' solo', feel: S.feel, scale: 'song', songScale: sg.scale, si: si, bpm: S.bpm,
+      explain: 'Original example solo in ' + sg.scaleName + ' over a generic ' + S.prog + ' backing (' + (S.feel === 'blues' ? '12/8 slow shuffle' : S.feel) + ' feel). ' + SOLO_EXPLAIN[level] + ' Not a transcription of the recording.',
+      bars: S.chords.map(function (c, i) { return [c[0], c[1], toks[i], null]; }) };
+    var d = tokenLesson(L, sg.key); d.feel = S.feel; d.song = si; d.lesson = L;
+    return (soloCache[id] = d);
+  }
+  return { SOLOS: SOLOS, SOLO_LV: SOLO_LV, songSolo: songSolo, soloScalePcs: soloScalePcs, SONGS: SONGS, LESSONS: LESSONS, LEVELS: LEVELS, lessonIn: lessonIn, neckPath: neckPath, triadsOn: triadsOn, sevenSharpNine: sevenSharpNine, thumbShape: thumbShape,
     pent: pent, chordObj: chordObj, IVW: IVW, IVSHORT: IVSHORT, SETS: SETS, QUAL: QUAL };
 })();
 </script>
@@ -1314,7 +1362,7 @@ var Hendrix = (function () {
     blues: { sub: 'licks', key: 9, lick: 0, bpm: 70, swing: true, loop: true, slow: false, jamBpm: 90, quick: false,
       jamScale: 'minorPent', jamShape: 0, chordTones: true, chordDiag: true, piece: 0,
       showme: false, lesson: 0, level: 'beginner', levelPos: { beginner: 0, intermediate: 0, advanced: 0 }, demo: true, lessonLoop: true, lessonBpm: 70, advanced: false, pieceBpm: 0 },
-    hendrix: { sub: 'hx', showme: true, hsub: 'songs', key: 4, lesson: 0, level: 'beginner', levelPos: { beginner: 0, intermediate: 0, advanced: 0 }, demo: true, lessonLoop: true, lessonBpm: 60,
+    hendrix: { sub: 'hx', showme: true, hsub: 'songs', songIdx: 0, songLevel: 'beginner', key: 4, lesson: 0, level: 'beginner', levelPos: { beginner: 0, intermediate: 0, advanced: 0 }, demo: true, lessonLoop: true, lessonBpm: 60,
       chordDiag: true, slow: false, swing: false, quick: false, loop: true, mapMode: 'major', mapSet: 3, advanced: false, chordTones: false, jamScale: 'minorPent', jamShape: 0, jamBpm: 60, bpm: 60, pieceBpm: 0, piece: 0, lick: 0 } };
   var state = load();
   var hl = null;        // currently sounding position {s,f}
@@ -1340,7 +1388,8 @@ var Hendrix = (function () {
     if (s.view !== 'triads') s.view = 'scale';
     var hx = s.hendrix;
     hx.key = mod(parseInt(hx.key, 10) || 0, 12); hx.sub = 'hx'; hx.showme = true; hx.swing = false; hx.quick = false;
-    if (hx.hsub !== 'map' && hx.hsub !== 'songs') hx.hsub = 'lessons';
+    if (hx.hsub === 'solo' && !(Hendrix.SONGS[hx.songIdx] && Hendrix.SOLO_LV.indexOf(hx.songLevel) >= 0)) hx.hsub = 'songs';
+    if (hx.hsub !== 'map' && hx.hsub !== 'songs' && hx.hsub !== 'solo') hx.hsub = 'lessons';
     if (!s.songsDefaultV2) { s.songsDefaultV2 = true; hx.hsub = 'songs'; s.tab = 'hendrix'; }
     if (s.tab === 'blues') { s.blues.sub = 'jam'; s.blues.showme = false; s.blues.key = 11; s.blues.quick = false; }
     if (['major', 'minor', 'change'].indexOf(hx.mapMode) < 0) hx.mapMode = 'major';
@@ -1627,7 +1676,7 @@ var Hendrix = (function () {
   function scaleTitle() {
     if (state.tab === 'quiz') return 'Fretboard Quiz';
     if (state.tab === 'blues') return 'Red House jam \u00b7 B slow blues';
-    if (HX()) return Blues.keyName(state.hendrix.key) + ' \u00b7 Hendrix ' + (state.hendrix.hsub === 'map' ? 'Triad Map' : state.hendrix.hsub === 'songs' ? 'Song Scales' : 'Lessons');
+    if (HX()) return Blues.keyName(state.hendrix.key) + ' \u00b7 Hendrix ' + (state.hendrix.hsub === 'map' ? 'Triad Map' : state.hendrix.hsub === 'songs' ? 'Song Scales' : state.hendrix.hsub === 'solo' ? Hendrix.SONGS[state.hendrix.songIdx].title + ' solo' : 'Lessons');
     if (state.tab === 'blues') return Blues.keyName(state.blues.key) + ' Blues \u00b7 ' + (state.blues.sub === 'jam' && state.blues.showme ? 'Show Me' : { licks: 'Licks', jam: 'Jam', pieces: 'Pieces' }[state.blues.sub]);
     if (state.tab === 'patterns') { var pi = T.scaleInfo(state.key, state.scale); return 'All 5 Patterns of ' + pi.tonic + ' ' + T.SCALES[state.scale].name; }
     if (state.tab === 'chords' || triadView()) {
@@ -1942,10 +1991,10 @@ var Hendrix = (function () {
   function bluesData() {
     var b = B();
     if (HX()) {
-      var hid = 'hx:' + b.key + ':' + (b.hsub === 'map' ? 'map:' + b.mapMode + ':' + b.mapSet : 'L' + b.lesson);
+      var hid = 'hx:' + b.key + ':' + (b.hsub === 'solo' ? 'solo:' + b.songIdx + ':' + b.songLevel : b.hsub === 'map' ? 'map:' + b.mapMode + ':' + b.mapSet : 'L' + b.lesson);
       if (bluesCache.id !== hid) {
         bluesCache.id = hid;
-        bluesCache.data = b.hsub === 'map' ? Hendrix.neckPath(b.key, b.mapMode, b.mapSet, true) : Hendrix.lessonIn(b.lesson, b.key);
+        bluesCache.data = b.hsub === 'solo' ? Hendrix.songSolo(b.songIdx, b.songLevel) : b.hsub === 'map' ? Hendrix.neckPath(b.key, b.mapMode, b.mapSet, true) : Hendrix.lessonIn(b.lesson, b.key);
       }
       return bluesCache.data;
     }
@@ -2229,6 +2278,9 @@ var Hendrix = (function () {
     for (var i = 0; i < NB; i++) h.push('<button type="button" class="barc' + (BS.bar === i ? ' on' : '') + '" data-jbar="' + i + '" aria-label="Jump to bar ' + (i + 1) + ', ' + esc(barInfo(i).name) + '" aria-pressed="' + (BS.bar === i) + '"><span>' + (i + 1) + '</span>' + esc(barInfo(i).name) + '</button>');
     return h.join('') + '</div><div class="small bargrid-hint">Tap a bar to jump there</div>';
   }
+  function soloLevelBtns(si, cur) {
+    return '<div class="sololv">' + Hendrix.SOLO_LV.map(function (lv) { return '<button class="lvl-' + lv + (cur === lv ? ' on' : '') + '" data-hsolo="' + si + ':' + lv + '">' + lv.toUpperCase() + '</button>'; }).join('') + '</div>';
+  }
   function renderRedHouse(b, h) {
     h.push('<div class="bl-row"><button class="pill" data-tab="hendrix">\u2190 Song Scales</button></div>');
     h.push('<div class="tip"><b>Red House backing loop</b>: an original synthesized slow 12-bar blues shuffle in B (12/8 feel: four beats, each split in three). Drums, bass and soft chords are generated by this app; it is <b>not</b> a recreation of the recording. Changes: B7 \u00d74, E7 \u00d72, B7 \u00d72, F#7, E7, B7, F#7 (turnaround).</div>');
@@ -2253,7 +2305,7 @@ var Hendrix = (function () {
     if (HX() && b.hsub === 'songs') {
       h.push('<div class="small cb-intro">Facts only: key, main scale and tuning from public references. No riffs or transcriptions. Tap <b>Show this scale</b> to open it on the SCALE fretboard.</div><div class="hx-songs">');
       Hendrix.SONGS.forEach(function (sg, i) {
-        h.push('<div class="hx-song"><b>' + esc(sg.title) + '</b><div class="small">Key: ' + esc(sg.keyName) + ' \u00b7 Scale: ' + esc(sg.scaleName) + '</div><div class="small">Tuning: ' + esc(sg.tuning) + '</div><div class="small">' + esc(sg.note) + '</div><div class="small" style="opacity:.7">Source: ' + esc(sg.src) + '</div><button class="pill" data-hsong="' + i + '">Show this scale</button>' + (sg.jam ? ' <button class="showme-btn rh-play" data-hjam="' + i + '">\u25b6 Play backing</button>' : '') + '</div>');
+        h.push('<div class="hx-song"><b>' + esc(sg.title) + '</b><div class="small">Key: ' + esc(sg.keyName) + ' \u00b7 Scale: ' + esc(sg.scaleName) + '</div><div class="small">Tuning: ' + esc(sg.tuning) + '</div><div class="small">' + esc(sg.note) + '</div><div class="small" style="opacity:.7">Source: ' + esc(sg.src) + '</div><button class="pill" data-hsong="' + i + '">Show this scale</button>' + (sg.jam ? ' <button class="showme-btn rh-play" data-hjam="' + i + '">\u25b6 Play backing</button>' : '') + '<div class="small" style="margin-top:6px">Original example solos over a backing loop:</div>' + soloLevelBtns(i, null) + '</div>');
       });
       h.push('</div>'); $('#bluesPanel').innerHTML = h.join(''); return;
     }
@@ -2275,7 +2327,8 @@ var Hendrix = (function () {
         togBtn('swing', 'SWING', b.swing) + togBtn('loop', 'LOOP', b.loop) + togBtn('slow', 'SLOW', b.slow) + '</div>');
     } else if (HX() || (b.sub === 'jam' && b.showme)) {
       var ldata = bluesData(), mapMode = HX() && b.hsub === 'map';
-      var L = mapMode ? { name: 'Triad map', explain: '' } : LZ().LESSONS[b.lesson], lvIdx = LZ().LEVELS[b.level];
+      var soloMode = HX() && b.hsub === 'solo';
+      var L = mapMode ? { name: 'Triad map', explain: '' } : soloMode ? ldata.lesson : LZ().LESSONS[b.lesson], lvIdx = LZ().LEVELS[b.level];
       if (mapMode) {
         h.push('<div class="bl-row"><span class="seg">' + [['major', 'MAJOR'], ['minor', 'MINOR'], ['change', 'I \u2192 IV CHANGE']].map(function (x) {
           return '<button data-hmode="' + x[0] + '" class="' + (b.mapMode === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</span> <span class="seg">' + [[3, 'G-B-E'], [2, 'D-G-B']].map(function (x) {
@@ -2283,6 +2336,10 @@ var Hendrix = (function () {
         var c0 = ldata.chords[0], pn = b.mapMode === 'minor' ? 'minor' : 'major';
         h.push('<div class="tip"><b>Up and down the neck.</b> Every ' + esc(c0.name) + (b.mapMode === 'change' ? ' and ' + esc(ldata.chords[1].name) : '') + ' triad shape on the ' + Hendrix.SETS[b.mapSet].name + ' strings is outlined, and the faint dots are the ' + esc(Blues.keyName(b.key)) + ' ' + pn +
           ' pentatonic underneath: each triad sits inside the pentatonic, which is his signature idea. Orange = pentatonic fill notes that join one shape to the next. Arrows show the path: press play to go up the neck, then back down.</div>');
+      } else if (soloMode) {
+        h.push('<div class="bl-row"><button class="pill" data-hsub="songs">\u2190 Song Scales</button></div><div class="lname" style="text-align:center">' + esc(L.name) + '</div>');
+        h.push(soloLevelBtns(b.songIdx, b.songLevel));
+        h.push('<div class="small" style="text-align:center">Practice tempo ' + L.bpm + ' bpm \u00b7 progression: ' + esc(Hendrix.SOLOS[L.song].prog) + '</div>');
       } else {
       h.push('<div class="levels">' + ['beginner', 'intermediate', 'advanced'].map(function (lv) {
         return '<button data-blevel="' + lv + '" class="' + (b.level === lv ? 'on' : '') + '">' + lv.toUpperCase() + '</button>'; }).join('') + '</div>');
@@ -2376,6 +2433,7 @@ var Hendrix = (function () {
       for (var hb = 0; hb < data.chords.length; hb++) {
         var hc = data.chords[hb], h0 = hb * 4, rk = data.feel === 'rock', bassR = 28 + mod(hc.rootPc - 4, 12), civ = hc.tones.map(function (pc) { return mod(pc - hc.rootPc, 12); }).slice(0, 4);
         ev.push({ b: h0, kind: 'bar', bar: hb });
+        if (data.feel === 'blues') for (var sh = 0; sh < 4; sh++) { ev.push({ b: h0 + sh, kind: 'hat', v: 0.12 }); ev.push({ b: h0 + sh + 0.5, kind: 'hat', v: 0.07 }); if (sh % 2) ev.push({ b: h0 + sh, kind: 'snare' }); }
         for (var hbt = 0; hbt < 4; hbt++) {
           if (hbt % 2 === 0 || (rk && hbt === 2)) ev.push({ b: h0 + hbt, kind: 'kick' });
           if (hbt % 2) ev.push({ b: h0 + hbt, kind: 'snare' });
@@ -2407,7 +2465,8 @@ var Hendrix = (function () {
     ev.sort(function (a, c) { return a.b - c.b; });
     return { ev: ev, total: total };
   }
-  function bT(beat) { return BP.start + Blues.swingBeat(beat, B().swing) * BP.spb; }
+  function swingOn() { if (HX()) { var d = bluesData(); return !!(d && d.feel === 'blues'); } return B().swing; }
+  function bT(beat) { return BP.start + Blues.swingBeat(beat, swingOn()) * BP.spb; }
   function playBluesNote(n, t, dur) {
     var prev = BP.voices[n.s];
     if (prev) AudioEngine.cut(prev, t);
@@ -2478,7 +2537,7 @@ var Hendrix = (function () {
       var now = AudioEngine.now();
       Object.keys(BP.voices).forEach(function (s) { AudioEngine.cut(BP.voices[s], now); });
       BP.voices = {}; BP.ui = []; BP.endAt = Infinity;
-      BP.start = now + 0.06 - Blues.swingBeat(b0, B().swing) * BP.spb;
+      BP.start = now + 0.06 - Blues.swingBeat(b0, swingOn()) * BP.spb;
       BP.i = BP.cycle.findIndex(function (e) { return e.b >= b0 - 1e-9; }); if (BP.i < 0) BP.i = BP.cycle.length;
       if (!BP.timer) BP.timer = setInterval(bluesTick, 25);
       bluesTick(); BP.startBar = 0;
@@ -2498,7 +2557,7 @@ var Hendrix = (function () {
     }
     BP.start = now + countIn * BP.spb; BP.playing = true; BS.cur = -1; BS.bar = -1; BS.beat = -1; BS.say = '';
     var sbar = BP.startBar || 0; BP.startBar = 0;
-    if (sbar > 0 && sbar < BP.total / 4) { BP.start -= Blues.swingBeat(sbar * 4, B().swing) * BP.spb; BP.i = BP.cycle.findIndex(function (e) { return e.b >= sbar * 4 - 1e-9; }); if (BP.i < 0) BP.i = 0; }
+    if (sbar > 0 && sbar < BP.total / 4) { BP.start -= Blues.swingBeat(sbar * 4, swingOn()) * BP.spb; BP.i = BP.cycle.findIndex(function (e) { return e.b >= sbar * 4 - 1e-9; }); if (BP.i < 0) BP.i = 0; }
     clearInterval(BP.timer); BP.timer = setInterval(bluesTick, 25); bluesTick();
     cancelAnimationFrame(BP.raf); BP.raf = requestAnimationFrame(bluesFrame);
     render();
@@ -2534,6 +2593,7 @@ var Hendrix = (function () {
     if (d.bsub) { bluesReset(); b.sub = d.bsub; commit(); return true; }
     if (d.blevel) { bluesReset(); b.level = d.blevel; b.lesson = LZ().LEVELS[b.level][b.levelPos[b.level]]; commit(); return true; }
     if (d.hjam != null) { bluesReset(); var bl = state.blues; state.tab = 'blues'; bl.sub = 'jam'; bl.showme = false; bl.key = 11; bl.jamBpm = 66; bl.swing = true; bl.quick = false; bl.chordTones = true; bl.chordDiag = true; bl.jamShape = 0; bl.loop = true; if (bl.jamScale !== 'blues') bl.jamScale = 'minorPent'; state.key = 11; state.scale = bl.jamScale; commit(); bluesStart(); return true; }
+    if (d.hsolo) { var ps = d.hsolo.split(':'), ssi = +ps[0]; bluesReset(); b = state.hendrix; state.tab = 'hendrix'; b.hsub = 'solo'; b.songIdx = ssi; b.songLevel = ps[1]; b.key = Hendrix.SONGS[ssi].key; b.lessonBpm = Hendrix.SOLOS[Hendrix.SONGS[ssi].title].bpm; b.demo = true; commit(); return true; }
     if (d.hsong != null) { var sg = Hendrix.SONGS[+d.hsong]; bluesReset(); state.tab = 'scale'; state.view = 'scale'; state.key = sg.key; state.scale = sg.scale; commit(); return true; }
     if (d.hsub) { bluesReset(); b.hsub = d.hsub; commit(); return true; }
     if (d.hmode) { bluesReset(); b.mapMode = d.hmode; commit(); return true; }
