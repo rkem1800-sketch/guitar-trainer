@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fretboard Reference</title>
+<style>
+:root{--bg:#efe9df;--card:#fbf7f0;--ink:#2b2622;--muted:#7a7066;--line:#d9cfc2;--root:#d0342c}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1400px;margin:0 auto;padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 8px max(10px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:6px;min-height:100vh}
+.card{background:var(--card);border-radius:16px;box-shadow:0 2px 10px rgba(60,40,20,.08);padding:8px 12px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+h1{font:700 clamp(15px,2vw,20px) Georgia,serif;margin:0 6px 0 0;white-space:nowrap}
+label.ctl{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);display:flex;align-items:center;gap:4px}
+select,button{font:600 12.5px -apple-system,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 10px;cursor:pointer}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 9px}
+.seg button.on,button.tog.on{background:var(--ink);color:var(--card)}
+.legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:clamp(12px,1.45vw,15px)}
+.legend .eq{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.legend .sw{display:inline-block;width:13px;height:13px;border-radius:50%}
+.legend b{font-family:Georgia,serif;font-size:1.12em}
+.plain{font-size:clamp(11.5px,1.3vw,14px);color:var(--ink);margin-top:3px}
+.plain em{font-style:normal;background:#fff1c9;padding:0 4px;border-radius:4px}
+.board{padding:4px 4px 2px}
+svg#fb{display:block;width:100%;height:auto;max-height:calc(100vh - 170px);user-select:none;-webkit-user-select:none}
+.foot{font-size:11px;color:var(--muted);text-align:center}
+.dot{cursor:pointer}.dot:hover circle{stroke-width:3}
+@media (max-height:500px){.wrap{gap:4px;padding-top:4px}.card{padding:5px 10px}h1{font-size:14px}.plain{margin-top:1px}svg#fb{max-height:calc(100vh - 130px)}.foot{display:none}}
+@media print{
+  @page{size:landscape;margin:8mm}
+  html,body{background:#fff}
+  .wrap{min-height:0;padding:0;gap:4px}
+  .card{box-shadow:none;border:1px solid #ddd}
+  header select,header button,header label.ctl{display:none}
+  header .printtitle{display:inline}
+  svg#fb{max-height:none}
+  .foot{display:none}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+.printtitle{display:none;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="card">
+    <h1>Fretboard Reference</h1>
+    <label class="ctl">KEY <select id="key" aria-label="Key"></select></label>
+    <label class="ctl">SCALE <select id="scale" aria-label="Scale"></select></label>
+    <label class="ctl">INTERVALS AS <span class="seg" id="ivStyle"><button data-v="word">flat 7</button><button data-v="sym">b7</button></span></label>
+    <button class="tog" id="allTog" aria-pressed="false">Show all notes faintly</button>
+    <button class="tog" id="boxTog" aria-pressed="false">Box shapes</button>
+    <button id="printBtn">Print</button>
+    <span class="printtitle" id="printTitle"></span>
+  </header>
+  <section class="card">
+    <div class="legend" id="legend"></div>
+    <div class="plain">The small <b>b</b> means <b>flat</b> (one fret lower), <em>not the note B</em>. So &ldquo;flat 7&rdquo; (b7) is an <i>interval</i>; the note it lands on is shown in big letters (<span id="b7ex"></span>).</div>
+  </section>
+  <section class="card board"><svg id="fb" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Guitar fretboard"></svg></section>
+  <div class="foot">Tap any dot to hear it. Big letter = note name, small text = interval from the root. High E string on top (as you look down at the guitar).</div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var OPEN = [64, 59, 55, 50, 45, 40];            // drawn top to bottom: high e, B, G, D, A, low E
+  var SNAME = ['e', 'B', 'G', 'D', 'A', 'E'];
+  var FRETS = 15;
+  var KEYS = [['C', 0], ['Db', 1], ['D', 2], ['Eb', 3], ['E', 4], ['F', 5], ['F#', 6], ['G', 7], ['Ab', 8], ['A', 9], ['Bb', 10], ['B', 11]];
+  var SCALES = {
+    minorPent: { name: 'Minor Pentatonic', iv: [0, 3, 5, 7, 10] },
+    blues: { name: 'Blues', iv: [0, 3, 5, 6, 7, 10] },
+    majorPent: { name: 'Major Pentatonic', iv: [0, 2, 4, 7, 9] },
+    minor: { name: 'Natural Minor', iv: [0, 2, 3, 5, 7, 8, 10] },
+    major: { name: 'Major', iv: [0, 2, 4, 5, 7, 9, 11] },
+    all: { name: 'All notes', iv: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }
+  };
+  // interval semitones -> [symbol, words, scale-degree index (0 = 1st letter)]
+  var IV = { 0: ['1', 'root', 0], 1: ['b2', 'flat 2', 1], 2: ['2', '2', 1], 3: ['b3', 'flat 3', 2], 4: ['3', '3', 2], 5: ['4', '4', 3],
+    6: ['b5', 'flat 5', 4], 7: ['5', '5', 4], 8: ['b6', 'flat 6', 5], 9: ['6', '6', 5], 10: ['b7', 'flat 7', 6], 11: ['7', '7', 6] };
+  var IVNAME = { 0: 'root', 1: 'minor 2nd', 2: 'major 2nd', 3: 'minor 3rd', 4: 'major 3rd', 5: 'perfect 4th', 6: 'flat 5, the blue note', 7: 'perfect 5th', 8: 'minor 6th', 9: 'major 6th', 10: 'minor 7th', 11: 'major 7th' };
+  var COLORS = { 0: '#d0342c', 1: '#8d8d8d', 2: '#8a9a2b', 3: '#2f6fd6', 4: '#14998f', 5: '#2e9a4a', 6: '#8a3fc4', 7: '#e08a12', 8: '#9a7b5f', 9: '#b5557f', 10: '#3a3f9e', 11: '#c2448a' };
+  var LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'], NAT = [0, 2, 4, 5, 7, 9, 11];
+  var SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'], FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+  function mod(n, m) { return ((n % m) + m) % m; }
+  var st = { key: 9, scale: 'minorPent', ivStyle: 'word', all: false, boxes: false };
+  try { var sv = JSON.parse(localStorage.getItem('fbref.v1') || 'null'); if (sv) for (var k in st) if (k in sv) st[k] = sv[k]; } catch (e) { }
+  if (!SCALES[st.scale]) st.scale = 'minorPent';
+  if (!(st.key >= 0 && st.key < 12)) st.key = 9;
+  function save() { try { localStorage.setItem('fbref.v1', JSON.stringify(st)); } catch (e) { } }
+  var ALT = { 1: ['Db', 'C#'], 3: ['Eb', 'D#'], 6: ['F#', 'Gb'], 8: ['Ab', 'G#'], 10: ['Bb', 'A#'] };
+  function rawSpell(kn, iv) {
+    var li = LETTERS.indexOf(kn[0]), L = LETTERS[(li + IV[iv][2]) % 7], pc = mod(st.key + iv, 12), diff = mod(pc - NAT[LETTERS.indexOf(L)] + 6, 12) - 6;
+    return Math.abs(diff) > 1 ? null : L + (diff === 1 ? '#' : diff === -1 ? 'b' : '');
+  }
+  // key spelling for this scale: the enharmonic name whose notes spell cleanly (Db minor -> C# minor)
+  function keyName() {
+    var cands = ALT[st.key] || [KEYS.filter(function (k) { return k[1] === st.key; })[0][0]];
+    if (st.scale === 'all') return cands[0];
+    var best = cands[0], bestScore = 1e9;
+    cands.forEach(function (kn) {
+      var score = 0;
+      SCALES[st.scale].iv.forEach(function (iv) { var n = rawSpell(kn, iv); score += n === null ? 100 : /^(E#|B#|Fb|Cb)$/.test(n) ? 1 : 0; });
+      if (score < bestScore) { bestScore = score; best = kn; }
+    });
+    return best;
+  }
+  // spell the note at interval iv above the key letter (A + b7 = G, A + b3 = C, A + b5 = Eb)
+  function spell(iv) {
+    var kn = keyName(), li = LETTERS.indexOf(kn[0]), deg = IV[iv][2], L = LETTERS[(li + deg) % 7];
+    var pc = mod(st.key + iv, 12), diff = mod(pc - NAT[LETTERS.indexOf(L)] + 6, 12) - 6;
+    var name = L + (diff === 1 ? '#' : diff === -1 ? 'b' : diff === 0 ? '' : 'x');
+    var odd = name === 'Fb' || name === 'Cb' || name === 'E#' || name === 'B#';
+    if (diff > 1 || diff < -1 || (odd && (st.scale === 'all' || SCALES[st.scale].iv.length < 7))) {
+      var flatKey = /b/.test(kn) || kn === 'F';
+      name = (flatKey ? FLAT : SHARP)[pc];
+    }
+    return name;
+  }
+  function ivText(iv) { return st.ivStyle === 'word' ? IV[iv][1] : IV[iv][0]; }
+  function legendIvText(iv) { var t = ivText(iv); return t === 'root' ? '1' : t; }
+  // the 5 pentatonic box shapes: two scale notes per string, starting from each scale tone on the low E string
+  function boxes() {
+    var base = st.scale === 'majorPent' ? [0, 2, 4, 7, 9] : (st.scale === 'minorPent' || st.scale === 'blues') ? [0, 3, 5, 7, 10] : null;
+    if (!base) return [];
+    var LOW = [40, 45, 50, 55, 59, 64], out = [];
+    base.forEach(function (iv0, k) {
+      var startF = mod(st.key + iv0 - 40, 12);
+      [startF - 12, startF, startF + 12].forEach(function (sf) {
+        var pcs = base.map(function (x) { return mod(st.key + x, 12); }), p = 40 + sf, notes = [];
+        for (var i = 0; i < 12; i++) {
+          if (i > 0) { p++; while (pcs.indexOf(mod(p, 12)) < 0) p++; }
+          var s = Math.floor(i / 2); notes.push({ s: s, f: p - LOW[s] });
+        }
+        var fr = notes.map(function (n) { return n.f; }), lo = Math.min.apply(null, fr), hi = Math.max.apply(null, fr);
+        if (lo >= 0 && hi <= FRETS) out.push({ k: k, lo: lo, hi: hi, notes: notes });
+      });
+    });
+    return out;
+  }
+  // ---- drawing
+  var X0 = 62, FW = 72, NUTX = X0 + 46, Y0 = 34, SG = 48, W = NUTX + FW * FRETS + 20, H = Y0 + SG * 5 + 44;
+  function fx(f) { return f === 0 ? X0 + 20 : NUTX + (f - 0.5) * FW; }
+  function sy(r) { return Y0 + r * SG; }
+  function render() {
+    var sc = SCALES[st.scale], inScale = {}, h = [];
+    sc.iv.forEach(function (iv) { inScale[mod(st.key + iv, 12)] = iv; });
+    var showFaint = st.all || st.scale === 'all';
+    h.push('<rect x="' + NUTX + '" y="' + (Y0 - 14) + '" width="' + FW * FRETS + '" height="' + (SG * 5 + 28) + '" rx="6" fill="#f3ead9"/>');
+    // inlays
+    [3, 5, 7, 9, 15].forEach(function (f) { h.push('<circle cx="' + fx(f) + '" cy="' + (Y0 + SG * 2.5) + '" r="7" fill="#d8ccb8"/>'); });
+    h.push('<circle cx="' + fx(12) + '" cy="' + (Y0 + SG * 1.5) + '" r="7" fill="#d8ccb8"/><circle cx="' + fx(12) + '" cy="' + (Y0 + SG * 3.5) + '" r="7" fill="#d8ccb8"/>');
+    // boxes
+    if (st.boxes) {
+      var bxs = boxes(), BC = ['#d0342c', '#2f6fd6', '#2e9a4a', '#e08a12', '#8a3fc4'];
+      bxs.forEach(function (b, i) {
+        var x1 = b.lo === 0 ? X0 + 2 : NUTX + (b.lo - 1) * FW + 4, x2 = NUTX + b.hi * FW - 4, pad = (b.k % 2) * 5;
+        h.push('<rect class="box" data-box="' + (b.k + 1) + '" x="' + x1 + '" y="' + (Y0 - 18 + pad) + '" width="' + (x2 - x1) + '" height="' + (SG * 5 + 36 - pad * 2) + '" rx="10" fill="' + BC[b.k] + '" fill-opacity=".06" stroke="' + BC[b.k] + '" stroke-opacity=".55" stroke-width="2" stroke-dasharray="6 4"/>');
+        h.push('<text x="' + (x1 + x2) / 2 + '" y="' + (Y0 + SG * 5 + 40) + '" text-anchor="middle" font-size="12" font-weight="700" fill="' + BC[b.k] + '">Box ' + (b.k + 1) + ' (' + b.lo + '\u2013' + b.hi + ')</text>');
+      });
+    }
+    // frets + nut
+    for (var f = 1; f <= FRETS; f++) h.push('<line x1="' + (NUTX + f * FW) + '" x2="' + (NUTX + f * FW) + '" y1="' + (Y0 - 14) + '" y2="' + (Y0 + SG * 5 + 14) + '" stroke="#b9ab98" stroke-width="2"/>');
+    h.push('<rect x="' + (NUTX - 5) + '" y="' + (Y0 - 14) + '" width="7" height="' + (SG * 5 + 28) + '" fill="#2b2622" rx="2"/>');
+    // strings
+    for (var r = 0; r < 6; r++) {
+      h.push('<line x1="' + (X0 + 4) + '" x2="' + (NUTX + FW * FRETS) + '" y1="' + sy(r) + '" y2="' + sy(r) + '" stroke="#8b7f70" stroke-width="' + (1 + r * 0.45) + '"/>');
+      h.push('<text x="' + (X0 - 30) + '" y="' + (sy(r) + 5) + '" text-anchor="middle" font-size="14" font-weight="700" fill="#7a7066">' + SNAME[r] + '</text>');
+    }
+    // fret numbers
+    for (var n = 0; n <= FRETS; n++) h.push('<text x="' + fx(n) + '" y="' + (Y0 + SG * 5 + (st.boxes ? 24 : 34)) + '" text-anchor="middle" font-size="13" font-weight="600" fill="#7a7066">' + n + '</text>');
+    // dots
+    for (var rr = 0; rr < 6; rr++) for (var ff = 0; ff <= FRETS; ff++) {
+      var midi = OPEN[rr] + ff, pc = mod(midi, 12), cx = fx(ff), cy = sy(rr), iv = mod(pc - st.key, 12);
+      if (pc in inScale && st.scale !== 'all') {
+        var col = COLORS[iv], txt = ivText(iv), small = txt.length > 4 ? 8.6 : 10.5;
+        h.push('<g class="dot" data-s="' + rr + '" data-f="' + ff + '" data-midi="' + midi + '" data-note="' + spell(iv) + '" data-iv="' + IV[iv][0] + '">' +
+          '<circle cx="' + cx + '" cy="' + cy + '" r="18" fill="' + col + '" stroke="#fff" stroke-width="2"/>' +
+          '<text x="' + cx + '" y="' + (cy + 1) + '" text-anchor="middle" font-size="16" font-weight="800" fill="#fff" font-family="Georgia,serif">' + spell(iv) + '</text>' +
+          '<text x="' + cx + '" y="' + (cy + 12.5) + '" text-anchor="middle" font-size="' + small + '" font-weight="600" fill="#fff" opacity=".95">' + txt + '</text></g>');
+      } else if (st.scale === 'all') {
+        var c2 = COLORS[iv], t2 = ivText(iv);
+        h.push('<g class="dot" data-s="' + rr + '" data-f="' + ff + '" data-midi="' + midi + '" data-note="' + spell(iv) + '" data-iv="' + IV[iv][0] + '">' +
+          '<circle cx="' + cx + '" cy="' + cy + '" r="17" fill="' + (iv === 0 ? c2 : '#fff') + '" stroke="' + c2 + '" stroke-width="2.2"/>' +
+          '<text x="' + cx + '" y="' + (cy + 1) + '" text-anchor="middle" font-size="14" font-weight="800" fill="' + (iv === 0 ? '#fff' : '#2b2622') + '" font-family="Georgia,serif">' + spell(iv) + '</text>' +
+          '<text x="' + cx + '" y="' + (cy + 12) + '" text-anchor="middle" font-size="' + (t2.length > 4 ? 8 : 9.5) + '" font-weight="600" fill="' + (iv === 0 ? '#fff' : c2) + '">' + t2 + '</text></g>');
+      } else if (showFaint) {
+        h.push('<g class="dot faint" data-s="' + rr + '" data-f="' + ff + '" data-midi="' + midi + '" data-note="' + spell(iv) + '">' +
+          '<circle cx="' + cx + '" cy="' + cy + '" r="12" fill="#ece6dc" stroke="#cfc6b9"/>' +
+          '<text x="' + cx + '" y="' + (cy + 4) + '" text-anchor="middle" font-size="11" font-weight="600" fill="#a39a8e">' + spell(iv) + '</text></g>');
+      }
+    }
+    var svg = document.getElementById('fb');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + (H + (st.boxes ? 10 : 0)));
+    svg.innerHTML = h.join('');
+    // legend
+    var lg = sc.iv.map(function (iv) {
+      return '<span class="eq"><span class="sw" style="background:' + COLORS[iv] + '"></span>' + legendIvText(iv) + ' = <b>' + spell(iv) + '</b>' +
+        (st.scale !== 'all' ? ' <span style="color:var(--muted);font-size:.85em">(' + IVNAME[iv] + ')</span>' : '') + '</span>';
+    });
+    document.getElementById('legend').innerHTML = '<b style="font-family:inherit;font-size:1em">' + keyName() + ' ' + sc.name + ':</b> ' + lg.join('<span style="color:var(--muted)">\u00b7</span>');
+    var hasB7 = sc.iv.indexOf(10) >= 0;
+    document.getElementById('b7ex').textContent = 'in ' + keyName() + ', flat 7 = ' + spell(10) + (hasB7 ? '' : ', though this scale doesn\u2019t use it');
+    document.getElementById('printTitle').textContent = keyName() + ' ' + sc.name + ' \u00b7 intervals shown as ' + (st.ivStyle === 'word' ? '"flat 7"' : '"b7"');
+    // controls
+    document.getElementById('key').value = String(st.key);
+    document.getElementById('scale').value = st.scale;
+    [].forEach.call(document.querySelectorAll('#ivStyle button'), function (b) { b.classList.toggle('on', b.dataset.v === st.ivStyle); });
+    var at = document.getElementById('allTog'); at.classList.toggle('on', st.all); at.setAttribute('aria-pressed', st.all); at.disabled = st.scale === 'all';
+    var bt = document.getElementById('boxTog');
+    bt.classList.toggle('on', st.boxes); bt.setAttribute('aria-pressed', st.boxes);
+    bt.disabled = ['minorPent', 'blues', 'majorPent'].indexOf(st.scale) < 0; bt.title = bt.disabled ? 'Box shapes are for pentatonic / blues scales' : '';
+    save();
+  }
+  // ---- audio: tiny Karplus-Strong pluck
+  var AC = null;
+  function pluck(midi) {
+    try {
+      if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+      if (AC.state === 'suspended') AC.resume();
+      var sr = AC.sampleRate, freq = 440 * Math.pow(2, (midi - 69) / 12), dur = 1.6, len = Math.floor(sr * dur), N = Math.max(2, Math.round(sr / freq));
+      var buf = AC.createBuffer(1, len, sr), d = buf.getChannelData(0), ring = new Float32Array(N);
+      for (var i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+      for (var j = 0, p = 0; j < len; j++) { var nx = (p + 1) % N, v = ring[p]; d[j] = v; ring[p] = 0.996 * 0.5 * (v + ring[nx]); p = nx; }
+      var src = AC.createBufferSource(), g = AC.createGain(), lp = AC.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 3200; g.gain.value = 0.5;
+      src.buffer = buf; src.connect(lp); lp.connect(g); g.connect(AC.destination); src.start();
+    } catch (e) { }
+  }
+  // ---- controls
+  var ks = document.getElementById('key'), ss = document.getElementById('scale');
+  ks.innerHTML = KEYS.map(function (k) { return '<option value="' + k[1] + '">' + k[0] + '</option>'; }).join('');
+  ss.innerHTML = ['minorPent', 'blues', 'majorPent', 'minor', 'major', 'all'].map(function (k) { return '<option value="' + k + '">' + SCALES[k].name + '</option>'; }).join('');
+  ks.addEventListener('change', function () { st.key = +ks.value; render(); });
+  ss.addEventListener('change', function () { st.scale = ss.value; render(); });
+  document.getElementById('ivStyle').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { st.ivStyle = b.dataset.v; render(); } });
+  document.getElementById('allTog').addEventListener('click', function () { st.all = !st.all; render(); });
+  document.getElementById('boxTog').addEventListener('click', function () { st.boxes = !st.boxes; render(); });
+  document.getElementById('printBtn').addEventListener('click', function () { window.print(); });
+  document.getElementById('fb').addEventListener('click', function (e) {
+    var g = e.target.closest('.dot'); if (!g) return;
+    pluck(+g.dataset.midi);
+    var c = g.querySelector('circle'); c.style.transition = 'transform .15s'; c.setAttribute('stroke', '#222'); setTimeout(function () { c.setAttribute('stroke', g.classList.contains('faint') ? '#cfc6b9' : '#fff'); }, 250);
+  });
+  window.__ref = { st: st, render: render, spell: spell, boxes: boxes };
+  render();
+})();
+</script>
+</body>
+</html>
