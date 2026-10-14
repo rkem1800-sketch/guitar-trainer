@@ -179,9 +179,11 @@ select.nv{font-size:17px;font-weight:400;width:62px}
 .pill.tog.on{border:2px solid var(--blue);color:var(--blue)}
 .stepbtn{height:44px;min-width:92px}
 .bars{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:8px 4px}
-.barc{border:1px solid var(--btnBorder);background:var(--btn);border-radius:8px;padding:3px 2px 5px;text-align:center;font:700 14px Georgia,serif}
+.barc{border:1px solid var(--btnBorder);background:var(--btn);color:var(--ink);border-radius:8px;padding:3px 2px 5px;text-align:center;font:700 14px Georgia,serif;cursor:pointer;min-height:46px;width:100%;-webkit-tap-highlight-color:rgba(47,128,237,.25);touch-action:manipulation;transition:transform .08s}
+.barc:hover{border-color:var(--blue);box-shadow:0 0 0 2px rgba(47,128,237,.25)}.barc:active{transform:scale(.95)}.barc:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.bargrid-hint{text-align:center;margin:2px 0 0}
 .barc span{display:block;font:600 9px -apple-system,sans-serif;color:var(--muted)}
-.barc.on{background:var(--blue);color:#fff;border-color:var(--blue)}.barc.on span{color:#dbe9ff}
+.barc.on{background:var(--blue);color:#fff;border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,128,237,.35)}.barc.on span{color:#dbe9ff}
 .nowlick{text-align:center;font-size:13px;margin:4px 0}
 .fb .dot.pass{fill:#4f6d8f}
 .fb .dot.ct{fill:var(--blue)}
@@ -2224,8 +2226,8 @@ var Hendrix = (function () {
   }
   function barGrid() {
     var h = ['<div class="bars">'], NB = nBars();
-    for (var i = 0; i < NB; i++) h.push('<div class="barc' + (BS.bar === i ? ' on' : '') + '"><span>' + (i + 1) + '</span>' + esc(barInfo(i).name) + '</div>');
-    return h.join('') + '</div>';
+    for (var i = 0; i < NB; i++) h.push('<button type="button" class="barc' + (BS.bar === i ? ' on' : '') + '" data-jbar="' + i + '" aria-label="Jump to bar ' + (i + 1) + ', ' + esc(barInfo(i).name) + '" aria-pressed="' + (BS.bar === i) + '"><span>' + (i + 1) + '</span>' + esc(barInfo(i).name) + '</button>');
+    return h.join('') + '</div><div class="small bargrid-hint">Tap a bar to jump there</div>';
   }
   function renderRedHouse(b, h) {
     h.push('<div class="bl-row"><button class="pill" data-tab="hendrix">\u2190 Song Scales</button></div>');
@@ -2465,6 +2467,24 @@ var Hendrix = (function () {
     if (!BP.timer && now >= BP.endAt + 0.3) { bluesStop(); return; }
     BP.raf = requestAnimationFrame(bluesFrame);
   }
+  // jump to bar i: playing -> continue from that bar's downbeat; stopped -> show it, and Play starts there
+  function barJump(i) {
+    var data = bluesData() || { steps: [], says: [] }, nb = nBars();
+    if (!(i >= 0 && i < nb)) return;
+    var b0 = i * 4, si = data.steps.findIndex(function (st) { return st.b >= b0 - 1e-9; }), say = '';
+    (data.says || []).forEach(function (x) { if (x.b <= b0 + 1e-9) say = x.text; });
+    BS.bar = i; BS.cur = si >= 0 && data.steps[si].b < b0 + 4 ? si : -1; BS.say = say; BS.beat = -1;
+    if (BP.playing) {
+      var now = AudioEngine.now();
+      Object.keys(BP.voices).forEach(function (s) { AudioEngine.cut(BP.voices[s], now); });
+      BP.voices = {}; BP.ui = []; BP.endAt = Infinity;
+      BP.start = now + 0.06 - Blues.swingBeat(b0, B().swing) * BP.spb;
+      BP.i = BP.cycle.findIndex(function (e) { return e.b >= b0 - 1e-9; }); if (BP.i < 0) BP.i = BP.cycle.length;
+      if (!BP.timer) BP.timer = setInterval(bluesTick, 25);
+      bluesTick(); BP.startBar = 0;
+    } else BP.startBar = i;
+    render();
+  }
   function bluesStart() {
     if (!AudioEngine.ensure()) { alert('Web Audio is not supported in this browser.'); return; }
     stopPlayback();
@@ -2477,6 +2497,8 @@ var Hendrix = (function () {
       for (var kk = 0; kk < countIn; kk++) BP.ui.push({ t: now + kk * BP.spb, beat: kk, say: 'Count-in: ' + ['1', '1, 2', '1, 2, 3', '1, 2, 3, 4'][kk] + '\u2026 get ready. ' + first });
     }
     BP.start = now + countIn * BP.spb; BP.playing = true; BS.cur = -1; BS.bar = -1; BS.beat = -1; BS.say = '';
+    var sbar = BP.startBar || 0; BP.startBar = 0;
+    if (sbar > 0 && sbar < BP.total / 4) { BP.start -= Blues.swingBeat(sbar * 4, B().swing) * BP.spb; BP.i = BP.cycle.findIndex(function (e) { return e.b >= sbar * 4 - 1e-9; }); if (BP.i < 0) BP.i = 0; }
     clearInterval(BP.timer); BP.timer = setInterval(bluesTick, 25); bluesTick();
     cancelAnimationFrame(BP.raf); BP.raf = requestAnimationFrame(bluesFrame);
     render();
@@ -2505,8 +2527,9 @@ var Hendrix = (function () {
     if (data.says) { var sy = null; data.says.forEach(function (x) { if (x.b <= st.b + 1e-9) sy = x; }); if (sy) BS.say = sy.text; }
     bluesPlayhead();
   }
-  function bluesReset() { bluesStop(); BS.cur = -1; BS.bar = -1; BS.beat = -1; BS.say = ''; bluesCache.id = ''; }
+  function bluesReset() { BP.startBar = 0; bluesStop(); BS.cur = -1; BS.bar = -1; BS.beat = -1; BS.say = ''; bluesCache.id = ''; }
   function bluesClick(t, d) {
+    if (d.jbar != null) { barJump(+d.jbar); return true; }
     var b = B();
     if (d.bsub) { bluesReset(); b.sub = d.bsub; commit(); return true; }
     if (d.blevel) { bluesReset(); b.level = d.blevel; b.lesson = LZ().LEVELS[b.level][b.levelPos[b.level]]; commit(); return true; }
